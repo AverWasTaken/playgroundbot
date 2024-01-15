@@ -11,14 +11,14 @@ import os
 users_file_path = r'C:\Users\Administrator\Desktop\users.txt'
 
 #Generate Random Colors For Embeds. 
-TOKEN = 'Njk5NjgzNDg5MTQ1OTQ2MTcz.GEkIdQ.uw2xk8Rs3tca2FsWhml_00DIRilYeL7k020RoM'
+TOKEN = ''
 hex_characters = "0123456789ABCDEF"
 embedfooter= 'developed with love, by ayvyr <3'
 helpcmdsbot ='`.ping`>>check to see if the bots alive.\n`.activity`>>change the bots "playing" activity status.\n`.cgpt`>>use chatgpt within the bot'
 helpcmdsadmin ='`.ban`>>ban the user specified from server.\n`.kick`>>kick the user specified from server.\n`.timeout`>>time a user out for a specified time.\n`.purge`>>delete a specified number of messages.'
 user_threads = {}
 assistant_id = 'asst_2lTtaoe1p0gQLI2rgyTdzV3G'
-openai_api_key = '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'
+openai_api_key = ''
 client_openai = openai.OpenAI(api_key=openai_api_key)
 # ----------------------------------------------- #
 
