@@ -1,24 +1,27 @@
-# A custom coded discord bot for the playground. desgined and made with love by ayvyr
-
 import discord
 from discord.ext import commands
 import random
 import datetime
 import openai
 import asyncio
+from openai import OpenAI
 import os
- 
-TOKEN = ''
+
+# Path to the users file
+users_file_path = r'C:\Users\Administrator\Desktop\users.txt'
+
+#Generate Random Colors For Embeds. 
+TOKEN = 'Njk5NjgzNDg5MTQ1OTQ2MTcz.GEkIdQ.uw2xk8Rs3tca2FsWhml_00DIRilYeL7k020RoM'
+hex_characters = "0123456789ABCDEF"
 embedfooter= 'developed with love, by ayvyr <3'
 helpcmdsbot ='`.ping`>>check to see if the bots alive.\n`.activity`>>change the bots "playing" activity status.\n`.cgpt`>>use chatgpt within the bot'
 helpcmdsadmin ='`.ban`>>ban the user specified from server.\n`.kick`>>kick the user specified from server.\n`.timeout`>>time a user out for a specified time.\n`.purge`>>delete a specified number of messages.'
 user_threads = {}
-assistant_id = ''
-openai_api_key = ''
+assistant_id = 'asst_2lTtaoe1p0gQLI2rgyTdzV3G'
+openai_api_key = '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'
 client_openai = openai.OpenAI(api_key=openai_api_key)
 # ----------------------------------------------- #
-# Path to the users file
-users_file_path = r'C:\Users\Administrator\Desktop\users.txt'
+
 
 
 # Define the bot, command prefix, and intents
@@ -31,6 +34,8 @@ client = OpenAI(api_key=openai_api_key)
 @bot.event
 async def on_ready():
     print(f'We have logged in as {bot.user}')
+
+# ----------------------------------------------- #
 
 @bot.event
 async def on_member_join(member):
@@ -98,6 +103,7 @@ async def help_command(ctx):
 async def ping_cmd(ctx):
     await ctx.send('Pong!')
 # ----------------------------------------------- #
+
 #Ban Command
 
 
@@ -128,10 +134,9 @@ async def ban_error(ctx, error):
         embed = discord.Embed(title=':x: **specify someone next time idiot??**', color=0xFF0000)
         embed.set_footer(text=f'command ran by administrator, {ctx.message.author.name}')
         await ctx.send(embed=embed)
-
-
 # ----------------------------------------------- #
-#Activity command
+
+#activity command
 def has_any_role(ctx):
     allowed_roles = ['1179262457223589899', '1179262534382002246']
     user_roles = [str(role.id) for role in ctx.author.roles]  # Ensure the role IDs are strings
@@ -158,6 +163,10 @@ async def activ_error(ctx,error):
         await ctx.send(embed=embed)
 # ----------------------------------------------- #
 
+#cgpt command
+
+#filler for now
+# ----------------------------------------------- #
 #Kick Command
 
 
@@ -178,7 +187,7 @@ async def kick(ctx, member: discord.Member, *, reason="No reason provided"):
         embed = discord.Embed(title=':question: **i cant do that LOL**', color=0xFF0000)
         await ctx.send(embed=embed)
 
-@kick.error
+@ban.error
 async def kick_error(ctx, error):
     if isinstance(error, commands.CheckFailure):
         embed = discord.Embed(title=':x: **insufficient permissions, nice try lol**', color=0xFF0000)
@@ -232,15 +241,12 @@ async def timeout_error(ctx, error):
 
 # ----------------------------------------------- #
 
-#Timeout typo command
+#timeout typo command
 @bot.command(name='timout')
 async def timout(ctx):
     embed = discord.Embed(title=':question: **did you mean, .timeout? :sob:**', color=0xFF0000)
     await ctx.send(embed=embed)
-
-
 # ----------------------------------------------- #
-#Purge Command
 @bot.command(name='purge')
 @commands.check(has_any_role)
 async def purge(ctx, num: int):
@@ -262,8 +268,7 @@ async def purge_error(ctx, error):
         embed = discord.Embed(title=':x: **invalid argument**', description='how many messages do you want to purge?', color=0xFF0000)
         await ctx.send(embed=embed)
 
-# ----------------------------------------------- #
-#ChatGPT Command
+
 
 def has_any_role(ctx):
     allowed_roles = ['1179290440978149386', '1179291074200617000']
@@ -311,9 +316,26 @@ async def cgpt_error(ctx, error):
         embed = discord.Embed(title=':x: **insufficient permissions to use ChatGPT, nice try lol**', color=0xFF0000)
         embed.set_footer(text=f'command ran by user, {ctx.message.author.name}')
         await ctx.send(embed=embed)
+    
+@bot.command(name="imggpt")
+@commands.check(has_any_role)
+async def imggpt(ctx, *, user_input: str):
+    async with ctx.typing():
+        response = client.images.generate(
+        model="dall-e-2",
+        prompt=user_input,
+        size="1024x1024",
+        quality="standard",
+        n=1,
+    )
+    image_url = response.data[0].url
+    await ctx.send(image_url)
 
-# ----------------------------------------------- #  
+@imggpt.error
+async def imggpt_error(ctx, error):
+    if isinstance(error, commands.CheckFailure):
+        embed = discord.Embed(title=':x: **insufficient permissions to use ChatGPT Image Creation, nice try lol**', color=0xFF0000)
+        embed.set_footer(text=f'command ran by user, {ctx.message.author.name}')
+        await ctx.send(embed=embed)
 # Run the bot
 bot.run(TOKEN)
-
-
