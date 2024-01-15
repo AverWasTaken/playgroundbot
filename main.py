@@ -6,7 +6,7 @@ import random
 import datetime
 import openai
 import asyncio
-
+import os
  
 TOKEN = ''
 embedfooter= 'developed with love, by ayvyr <3'
@@ -17,18 +17,69 @@ assistant_id = ''
 openai_api_key = ''
 client_openai = openai.OpenAI(api_key=openai_api_key)
 # ----------------------------------------------- #
-
+# Path to the users file
+users_file_path = r'C:\Users\Administrator\Desktop\users.txt'
 
 
 # Define the bot, command prefix, and intents
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix='.', intents=intents)
 bot.remove_command('help')
+client = OpenAI(api_key=openai_api_key)
 # ----------------------------------------------- #
 
 @bot.event
 async def on_ready():
     print(f'We have logged in as {bot.user}')
+
+@bot.event
+async def on_member_join(member):
+    # Attempt to create a DM channel and send a welcome message
+    try:
+        if member.dm_channel is None:
+            await member.create_dm()
+        await member.dm_channel.send("Welcome to The Playground!")
+    except Exception as e:
+        print(f"Could not send a welcome message to {member.name}. Error: {e}")
+
+    with open(users_file_path, 'a') as file:
+        file.write(f'{member.id},{member.name}\n')
+# ----------------------------------------------- #
+
+
+# Member Leave Message
+@bot.event
+async def on_member_remove(member):
+    user_name = None
+    with open(users_file_path, 'r') as file:
+        for line in file:
+            user_id, name = line.strip().split(',')
+            if int(user_id) == member.id:
+                user_name = name
+                break
+
+    if user_name is None:
+        print(f"User data not found for ID: {member.id}")
+        return
+      
+    try:
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": f"Generate a personalized goodbye message for a Discord user named {user_name}. They left a server called The Playground, and our goal is for user retention. Make them possibly want to join back by making your message convincing. The message should not be longer than a sentence or two. Include a funny joke that relates to them leaving and the server."}
+            ]
+        )
+        
+        goodbye_message = response.choices[0].message.content
+        # Send the personalized message to the user's direct message
+        try:
+            if member.dm_channel is None:
+                await member.create_dm()
+            await member.dm_channel.send(goodbye_message)
+        except discord.errors.Forbidden:
+            print(f"Could not send a direct message to {user_name}. They might have their DMs disabled for non-friends or have no mutual server with the bot.")
+    except Exception as e:
+         print(f"An error occurred while trying to send a message to {user_name}. Error: {e}")
 
 # ----------------------------------------------- #
 
