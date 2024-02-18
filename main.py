@@ -6,6 +6,8 @@ import openai
 import asyncio
 from openai import OpenAI
 import os
+from pathlib import Path
+from discord import FFmpegPCMAudio
 
 # Path to the users file
 users_file_path = r'C:\Users\Administrator\Desktop\users.txt'
@@ -17,7 +19,7 @@ embedfooter= 'developed with love, by ayvyr <3'
 helpcmdsbot ='`.ping`>>check to see if the bots alive.\n`.activity`>>change the bots "playing" activity status.\n`.cgpt`>>use chatgpt within the bot'
 helpcmdsadmin ='`.ban`>>ban the user specified from server.\n`.kick`>>kick the user specified from server.\n`.timeout`>>time a user out for a specified time.\n`.purge`>>delete a specified number of messages.'
 user_threads = {}
-assistant_id = 'asst_2lTtaoe1p0gQLI2rgyTdzV3G'
+assistant_id = ''
 openai_api_key = ''
 client_openai = openai.OpenAI(api_key=openai_api_key)
 # ----------------------------------------------- #
@@ -320,16 +322,20 @@ async def cgpt_error(ctx, error):
 @bot.command(name="imggpt")
 @commands.check(has_any_role)
 async def imggpt(ctx, *, user_input: str):
-    async with ctx.typing():
-        response = client.images.generate(
-        model="dall-e-2",
-        prompt=user_input,
-        size="1024x1024",
-        quality="standard",
-        n=1,
-    )
-    image_url = response.data[0].url
-    await ctx.send(image_url)
+    try:
+        async with ctx.typing():
+            response = client.images.generate(
+                model="dall-e-3",
+                prompt=user_input,
+                size="1024x1024",
+                quality="standard",
+                n=1,
+            )
+        image_url = response.data[0].url
+        await ctx.send(image_url)
+    except Exception as e:
+        await ctx.send("Sorry, I can't generate that!")
+
 
 @imggpt.error
 async def imggpt_error(ctx, error):
@@ -337,5 +343,206 @@ async def imggpt_error(ctx, error):
         embed = discord.Embed(title=':x: **insufficient permissions to use ChatGPT Image Creation, nice try lol**', color=0xFF0000)
         embed.set_footer(text=f'command ran by user, {ctx.message.author.name}')
         await ctx.send(embed=embed)
+
+
+
+
+@bot.command(name="ttsgpt")
+@commands.check(has_any_role)
+async def ttsgpt(ctx, *, user_input: str):
+    try:
+        speech_file_path = Path(__file__).parent / "speech.mp3"
+        response = client.audio.speech.create(
+            model="tts-1-hd",
+            voice="onyx",
+            input=user_input  # Use the user's input here
+        )
+
+        response.stream_to_file(speech_file_path)
+
+        await ctx.send(file=discord.File(speech_file_path))  # Send the file to the Discord channel
+
+    except Exception as e:  # Handle any exceptions
+        await ctx.send(f"An error occurred: {e}")
+
+
+
+@ttsgpt.error
+async def ttsgpt_error(ctx, error):
+    if isinstance(error, commands.CheckFailure):
+        embed = discord.Embed(title=':x: **insufficient permissions to use ChatGPT Image Creation, nice try lol**', color=0xFF0000)
+        embed.set_footer(text=f'command ran by user, {ctx.message.author.name}')
+        await ctx.send(embed=embed)
+
+@bot.command(name="vctalk")
+@commands.check(has_any_role)
+async def vctalk(ctx, *, user_input: str):
+    try:
+        # Ensure the user is in a voice channel
+        if not ctx.author.voice:
+            await ctx.send("You are not connected to a voice channel.")
+            return
+
+        voice_channel = ctx.author.voice.channel
+
+        # Generate the TTS file
+        speech_file_path = Path(__file__).parent / "speech.mp3"
+        response = client.audio.speech.create(
+            model="tts-1-hd",
+            voice="nova",
+            input=user_input
+        )
+        response.stream_to_file(speech_file_path)
+
+        # Join the voice channel and play the audio
+        vc = await voice_channel.connect()
+        vc.play(FFmpegPCMAudio(executable="C:\\Users\\Administrator\\Desktop\\ffmpeg-6.1.1-essentials_build\\bin\\ffmpeg.exe", source=str(speech_file_path)))
+
+        # Wait until the audio is done playing
+        while vc.is_playing():
+            await asyncio.sleep(1)
+
+        # Disconnect after the audio has finished playing
+        await vc.disconnect()
+
+    except Exception as e:
+        await ctx.send(f"An error occurred: {e}")
+        if vc.is_connected():
+            await vc.disconnect()
+
+@vctalk.error
+async def vctalk(ctx, error):
+    if isinstance(error, commands.CheckFailure):
+        embed = discord.Embed(title=':x: **insufficient permissions to use ChatGPT Image Creation, nice try lol**', color=0xFF0000)
+        embed.set_footer(text=f'command ran by user, {ctx.message.author.name}')
+        await ctx.send(embed=embed)
+
+
+@bot.command(name='cgpts')
+@commands.check(has_any_role)
+async def cgpts(ctx, *, user_input: str):
+    async with ctx.typing():
+        user_message = user_input.strip()
+        thread_id = user_threads.get(ctx.author.id)
+        if not thread_id:
+            thread = client_openai.beta.threads.create()
+            thread_id = thread.id
+            user_threads[ctx.author.id] = thread_id
+
+        client_openai.beta.threads.messages.create(thread_id=thread_id, role="user", content=user_message)
+        run = client_openai.beta.threads.runs.create(thread_id=thread_id, assistant_id=assistant_id)
+
+        run_status = "queued"
+        while run_status != "completed":
+            run_response = client_openai.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run.id)
+            run_status = run_response.status
+            await asyncio.sleep(1)
+
+        response = client_openai.beta.threads.messages.list(thread_id=thread_id)
+        if response.data:
+            for msg in response.data:
+                if msg.role == 'assistant' and msg.content:
+                    response_text = msg.content[0].text.value
+                    chunk_size = 1900
+                    for start in range(0, len(response_text), chunk_size):
+                        chunk = response_text[start:start + chunk_size]
+
+                    try:
+                        speech_file_path = Path(__file__).parent / "speech.mp3"
+                        response = client.audio.speech.create(
+                            model="tts-1-hd",
+                            voice="onyx",
+                            input=chunk  # Use the user's input here
+                        )
+
+                        response.stream_to_file(speech_file_path)
+
+                        await ctx.send(file=discord.File(speech_file_path)) 
+                    except Exception as e:
+                        await ctx.send(f"An error occurred: {e}") 
+                break
+        else:
+            await ctx.send("No response message found.")
+
+@cgpts.error
+async def cgpts_error(ctx, error):
+    if isinstance(error, commands.CheckFailure):
+        embed = discord.Embed(title=':x: **insufficient permissions to use ChatGPT, nice try lol**', color=0xFF0000)
+        embed.set_footer(text=f'command ran by user, {ctx.message.author.name}')
+        await ctx.send(embed=embed)
+
+
+
+@bot.command(name='vcgpt')
+@commands.check(has_any_role)
+async def vcgpt(ctx, *, user_input: str):
+    try:
+        # Ensure the user is in a voice channel
+        if not ctx.author.voice:
+            await ctx.send("You are not connected to a voice channel.")
+            return
+        
+        voice_channel = ctx.author.voice.channel
+
+        async with ctx.typing():
+            user_message = user_input.strip()
+            thread_id = user_threads.get(ctx.author.id)
+            if not thread_id:
+                thread = client_openai.beta.threads.create()
+                thread_id = thread.id
+                user_threads[ctx.author.id] = thread_id
+
+            client_openai.beta.threads.messages.create(thread_id=thread_id, role="user", content=user_message)
+            run = client_openai.beta.threads.runs.create(thread_id=thread_id, assistant_id=assistant_id)
+
+            run_status = "queued"
+            while run_status != "completed":
+                run_response = client_openai.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run.id)
+                run_status = run_response.status
+                await asyncio.sleep(1)
+
+            response = client_openai.beta.threads.messages.list(thread_id=thread_id)
+            if response.data:
+                for msg in response.data:
+                    if msg.role == 'assistant' and msg.content:
+                        response_text = msg.content[0].text.value
+                        chunk_size = 1900  # Assuming limit related to Discord message length
+                        for start in range(0, len(response_text), chunk_size):
+                            chunk = response_text[start:start + chunk_size]
+
+                        # Generate the TTS file
+                        speech_file_path = Path(__file__).parent / "speech.mp3"
+                        response = client.audio.speech.create(
+                            model="tts-1-hd",
+                            voice="nova",  # or "onyx", choose the preferred voice
+                            input=chunk  # Use the user's input here
+                        )
+                        response.stream_to_file(speech_file_path)
+                        vc = await voice_channel.connect()
+                        # Play the audio in the voice channel
+                        vc.play(FFmpegPCMAudio(executable="C:\\Users\\Administrator\\Desktop\\ffmpeg-6.1.1-essentials_build\\bin\\ffmpeg.exe", source=str(speech_file_path)))
+
+                        # Wait until audio is done playing
+                        while vc.is_playing():
+                            await asyncio.sleep(1)
+                        break
+            else:
+                await ctx.send("No response message found.")
+        await vc.disconnect()  # Disconnect after playing message
+
+    except Exception as e:
+        await ctx.send(f"An error occurred: {e}")
+        if vc and vc.is_connected():
+            await vc.disconnect()
+
+@vcgpt.error
+async def vcgpt_error(ctx, error):
+    # Handle insufficient permissions in the same way as before
+    if isinstance(error, commands.CheckFailure):
+        embed = discord.Embed(title=':x: **Insufficient permissions to use vcgpt, nice try lol**', color=0xFF0000)
+        embed.set_footer(text=f'Command ran by user, {ctx.message.author.name}')
+        await ctx.send(embed=embed)
+
 # Run the bot
+
 bot.run(TOKEN)
