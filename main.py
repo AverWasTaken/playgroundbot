@@ -8,6 +8,8 @@ from openai import OpenAI
 import os
 from pathlib import Path
 from discord import FFmpegPCMAudio
+import json
+from datetime import datetime
 
 # Path to the users file
 users_file_path = r'C:\Users\Administrator\Desktop\users.txt'
@@ -16,8 +18,8 @@ users_file_path = r'C:\Users\Administrator\Desktop\users.txt'
 TOKEN = ''
 hex_characters = "0123456789ABCDEF"
 embedfooter= 'developed with love, by ayvyr <3'
-helpcmdsbot ='`.ping`>>check to see if the bots alive.\n`.activity`>>change the bots "playing" activity status.\n`.cgpt`>>use chatgpt within the bot'
-helpcmdsadmin ='`.ban`>>ban the user specified from server.\n`.kick`>>kick the user specified from server.\n`.timeout`>>time a user out for a specified time.\n`.purge`>>delete a specified number of messages.'
+helpcmdsbot ='`.ping`>>check to see if the bots alive.\n`.activity`>>change the bots "playing" activity status.\n`.cgpt`>>use chatgpt within the bot\n`.ttsgpt`>>convert text to speech\n`.imggpt`>>make any image of your choosing.'
+helpcmdsadmin ='`.ban`>>ban the user specified from server.\n`.kick`>>kick the user specified from server.\n`.timeout`>>time a user out for a specified time.\n`.purge`>>delete a specified number of messages.\n`.warn`>>warn a user.\n`.infractions`>>view a users infractions.\n`.clear`>>clear a users infractions. optinally, you can also specify what infracton to clear.'
 user_threads = {}
 assistant_id = ''
 openai_api_key = ''
@@ -107,8 +109,6 @@ async def ping_cmd(ctx):
 # ----------------------------------------------- #
 
 #Ban Command
-
-
 def has_any_role(ctx):
     allowed_roles = ['1179262457223589899', '1179262534382002246']
     user_roles = [str(role.id) for role in ctx.author.roles]  # Ensure the role IDs are strings
@@ -163,11 +163,7 @@ async def activ_error(ctx,error):
         embed = discord.Embed(title=':question: **specify an activity next time idiot??**', color=0xFF0000)
         embed.set_footer(text=f'command ran by administrator, {ctx.message.author.name}')
         await ctx.send(embed=embed)
-# ----------------------------------------------- #
 
-#cgpt command
-
-#filler for now
 # ----------------------------------------------- #
 #Kick Command
 
@@ -201,6 +197,162 @@ async def kick_error(ctx, error):
         await ctx.send(embed=embed)
 
 # ----------------------------------------------- #
+
+#Warn Command
+        
+import json
+import discord
+from discord.ext import commands
+from datetime import datetime
+
+@bot.command(name='warn')
+@commands.check(has_any_role)
+async def warn(ctx, member: discord.Member, *, reason: str):
+    # Define the path to your warnings file
+    warnings_file_path = r'C:\Users\human\OneDrive\Desktop\Code\Playground\warnings.json'
+
+    # Load existing warnings from the file
+    try:
+        with open(warnings_file_path, 'r') as file:
+            try:
+                warnings = json.load(file)
+            except json.JSONDecodeError:  # Catch empty file or invalid JSON
+                warnings = {}
+                print("File is empty or contains invalid JSON. Starting with an empty dictionary.")
+    except FileNotFoundError:
+        warnings = {}
+        print("File not found. Starting with an empty dictionary.")
+
+    # Get the current timestamp
+    current_time = datetime.utcnow().isoformat()
+
+    # Structure the warning data
+    warning_data = {
+        'issuer': ctx.author.id,
+        'reason': reason,
+        'timestamp': current_time
+    }
+
+    # Add the warning to the member's list of warnings
+    if str(member.id) in warnings:
+        warnings[str(member.id)]['warnings'].append(warning_data)
+        warnings[str(member.id)]['count'] += 1
+    else:
+        warnings[str(member.id)] = {
+            'warnings': [warning_data],
+            'count': 1
+        }
+
+    # Save the updated warnings back to the file
+    with open(warnings_file_path, 'w') as file:
+        json.dump(warnings, file, indent=4)
+
+    # Confirmation message
+    embed = discord.Embed(title=f':warning: Warned {member}', description=f'Reason: {reason}', color=0xFFA500)
+    embed.set_footer(text=f'Warning issued by {ctx.author.name}')
+    await ctx.send(embed=embed)
+
+@warn.error
+async def warn_error(ctx, error):
+    if isinstance(error, commands.CheckFailure):
+        embed = discord.Embed(title=':x: **Insufficient permissions**', color=0xFF0000)
+        await ctx.send(embed=embed)
+    elif isinstance(error, commands.MissingRequiredArgument):
+        embed = discord.Embed(title=':question: **Missing required argument**', description='Please specify a user and a reason.', color=0xFF0000)
+        await ctx.send(embed=embed)
+
+
+# ----------------------------------------------- #
+        
+#Infractions Command
+        
+@bot.command(name='infractions')
+@commands.check(has_any_role)
+async def infractions(ctx, member: discord.Member):
+    # Define the path to your warnings file
+    warnings_file_path = r'C:\Users\human\OneDrive\Desktop\Code\Playground\warnings.json'
+
+    # Try to load existing warnings from the file
+    try:
+        with open(warnings_file_path, 'r') as file:
+            warnings = json.load(file)
+    except FileNotFoundError:
+        warnings = {}
+
+    # Check if the member has any warnings
+    if str(member.id) in warnings:
+        member_warnings = warnings[str(member.id)]['warnings']
+        warning_count = warnings[str(member.id)]['count']
+
+        # Create an embed to display the warnings
+        embed = discord.Embed(title=f'Infractions for {member}', color=0xFFA500)
+        embed.add_field(name='Total Warnings', value=str(warning_count), inline=False)
+
+        for idx, warning in enumerate(member_warnings, start=1):
+            issuer = ctx.guild.get_member(warning['issuer'])
+            issuer_name = issuer.name if issuer else 'Unknown'
+            embed.add_field(name=f'Warning {idx}', value=f"Issuer: {issuer_name}\nReason: {warning['reason']}\nDate: {warning['timestamp']}", inline=False)
+
+        await ctx.send(embed=embed)
+    else:
+        await ctx.send(f"{member} has no infractions.")
+
+@infractions.error
+async def infractions_error(ctx, error):
+    if isinstance(error, commands.CheckFailure):
+        await ctx.send(':x: **You do not have permission to use this command.**')
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send(':question: **Please specify a user to check infractions for.**')
+# ----------------------------------------------- #
+        
+#Clear Command
+        
+@bot.command(name='clear')
+@commands.check(has_any_role)
+async def clear(ctx, member: discord.Member, warning_number: int = None):
+    # Define the path to your warnings file
+    warnings_file_path = r'C:\Users\human\OneDrive\Desktop\Code\Playground\warnings.json'
+
+    # Load existing warnings from the file
+    try:
+        with open(warnings_file_path, 'r') as file:
+            warnings = json.load(file)
+    except FileNotFoundError:
+        warnings = {}
+
+    # Check if the member has any warnings
+    if str(member.id) in warnings:
+        if warning_number is None:
+            # Clear all warnings
+            del warnings[str(member.id)]
+            action_taken = "all warnings"
+        else:
+            # Clear specific warning, if it exists
+            if 0 < warning_number <= len(warnings[str(member.id)]['warnings']):
+                del warnings[str(member.id)]['warnings'][warning_number - 1]
+                warnings[str(member.id)]['count'] -= 1
+                action_taken = f"warning #{warning_number}"
+            else:
+                await ctx.send(f"Warning #{warning_number} does not exist for {member}.")
+                return
+
+        # Save the updated warnings back to the file
+        with open(warnings_file_path, 'w') as file:
+            json.dump(warnings, file, indent=4)
+
+        await ctx.send(f"Cleared {action_taken} for {member}.")
+    else:
+        await ctx.send(f"{member} has no warnings to clear.")
+
+@clear.error
+async def clear_error(ctx, error):
+    if isinstance(error, commands.CheckFailure):
+        await ctx.send(':x: **You do not have permission to use this command.**')
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send(':question: **Please specify a user. Optionally, you can also specify a warning number to clear.**')
+
+# ----------------------------------------------- #
+        
 #Timeout Command
 
 def has_any_role(ctx):
@@ -269,8 +421,9 @@ async def purge_error(ctx, error):
     elif isinstance(error, commands.MissingRequiredArgument):
         embed = discord.Embed(title=':x: **invalid argument**', description='how many messages do you want to purge?', color=0xFF0000)
         await ctx.send(embed=embed)
+# ----------------------------------------------- #
 
-
+#ChatGPT Command
 
 def has_any_role(ctx):
     allowed_roles = ['1179290440978149386', '1179291074200617000']
@@ -318,7 +471,9 @@ async def cgpt_error(ctx, error):
         embed = discord.Embed(title=':x: **insufficient permissions to use ChatGPT, nice try lol**', color=0xFF0000)
         embed.set_footer(text=f'command ran by user, {ctx.message.author.name}')
         await ctx.send(embed=embed)
-    
+# ----------------------------------------------- #  
+
+#ImgGPT Command 
 @bot.command(name="imggpt")
 @commands.check(has_any_role)
 async def imggpt(ctx, *, user_input: str):
@@ -345,7 +500,9 @@ async def imggpt_error(ctx, error):
         await ctx.send(embed=embed)
 
 
-
+# ----------------------------------------------- #
+        
+#TTS Gpt Command
 
 @bot.command(name="ttsgpt")
 @commands.check(has_any_role)
@@ -373,6 +530,10 @@ async def ttsgpt_error(ctx, error):
         embed = discord.Embed(title=':x: **insufficient permissions to use ChatGPT Image Creation, nice try lol**', color=0xFF0000)
         embed.set_footer(text=f'command ran by user, {ctx.message.author.name}')
         await ctx.send(embed=embed)
+
+# ----------------------------------------------- #
+
+#Vc Talk Command
 
 @bot.command(name="vctalk")
 @commands.check(has_any_role)
